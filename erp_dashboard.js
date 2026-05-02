@@ -260,9 +260,9 @@ let products = [
 // Complaints database
 let complaints = [];
 
-// Leaves and Change Requests databases
+// Leaves and Pending Approvals databases
 let leaves = [];
-let change_requests = [];
+let pending_approvals = [];
 
 // Persistence Functions
 function saveToLocalStorage() {
@@ -270,7 +270,7 @@ function saveToLocalStorage() {
     localStorage.setItem('erp_products', JSON.stringify(products));
     localStorage.setItem('erp_complaints', JSON.stringify(complaints));
     localStorage.setItem('erp_leaves', JSON.stringify(leaves));
-    localStorage.setItem('erp_change_requests', JSON.stringify(change_requests));
+    localStorage.setItem('erp_pending_approvals', JSON.stringify(pending_approvals));
 }
 
 function loadFromLocalStorage() {
@@ -312,11 +312,11 @@ function loadFromLocalStorage() {
         } catch(e) {}
     }
     
-    const savedChangeRequests = localStorage.getItem('erp_change_requests');
-    if (savedChangeRequests) {
+    const savedPendingApprovals = localStorage.getItem('erp_pending_approvals');
+    if (savedPendingApprovals) {
         try {
-            const parsed = JSON.parse(savedChangeRequests);
-            if (Array.isArray(parsed)) change_requests = parsed;
+            const parsed = JSON.parse(savedPendingApprovals);
+            if (Array.isArray(parsed)) pending_approvals = parsed;
         } catch(e) {}
     }
 }
@@ -731,14 +731,13 @@ function setupMenu(role) {
         { href: '#inventory', text: 'Inventory Management' },
         { href: '#sales', text: 'Sales Management' },
         { href: '#reports', text: 'Reports & Analytics' },
-        { href: '#admin_requests', text: 'Admin Change Requests' }
+        { href: '#pending_approvals', text: 'Pending Approvals' }
     ];
     
     const managerItems = [
         { href: '#employees', text: 'Employee Management' },
         { href: '#sales', text: 'Sales Management' },
-        { href: '#reports', text: 'Reports & Analytics' },
-        { href: '#admin_requests', text: 'Admin Change Requests' }
+        { href: '#reports', text: 'Reports & Analytics' }
     ];
     
     // Add common items (My Profile is now available to everyone)
@@ -1041,29 +1040,73 @@ document.getElementById('addEmployeeForm').addEventListener('submit', function(e
     };
 
     
-    // Check if username already exists
-    if (employees.find(emp => emp.username === newEmployee.username)) {
-        alert('Username already exists. Please choose a different username.');
-        return;
+    // Check if employee already exists (Edit Mode)
+    const existingIndex = employees.findIndex(emp => emp.id === newEmployee.id);
+    
+    if (existingIndex >= 0) {
+        // Edit mode
+        if (currentUser && currentUser.role === 'manager') {
+            const approvalReq = {
+                id: 'PA' + Date.now(),
+                manager_id: currentUser.id,
+                manager_name: currentUser.name,
+                action_type: 'Edit Employee',
+                module: 'Employee Management',
+                details: `Editing Employee: ${newEmployee.name} (${newEmployee.id})`,
+                data: newEmployee,
+                created_at: new Date().toISOString(),
+                status: 'pending'
+            };
+            pending_approvals.push(approvalReq);
+            saveToLocalStorage();
+            alert('Employee edit request submitted for admin approval!');
+            this.reset();
+            return;
+        } else {
+            // Keep existing attendance
+            newEmployee.attendance = employees[existingIndex].attendance;
+            employees[existingIndex] = newEmployee;
+            alert('Employee updated successfully!');
+        }
+    } else {
+        // Add mode
+        // Check if username already exists
+        if (employees.find(emp => emp.username === newEmployee.username)) {
+            alert('Username already exists. Please choose a different username.');
+            return;
+        }
+        
+        // Check if email already exists
+        if (employees.find(emp => emp.email === newEmployee.email)) {
+            alert('Email already registered. Please use a different email address.');
+            return;
+        }
+        
+        if (currentUser && currentUser.role === 'manager') {
+            const approvalReq = {
+                id: 'PA' + Date.now(),
+                manager_id: currentUser.id,
+                manager_name: currentUser.name,
+                action_type: 'Add Employee',
+                module: 'Employee Management',
+                details: `Adding New Employee: ${newEmployee.name}`,
+                data: newEmployee,
+                created_at: new Date().toISOString(),
+                status: 'pending'
+            };
+            pending_approvals.push(approvalReq);
+            saveToLocalStorage();
+            alert('Employee addition request submitted for admin approval!');
+            this.reset();
+            return;
+        } else {
+            employees.push(newEmployee);
+            alert('Employee added successfully!\n\nUsername: ' + newEmployee.username + '\nPassword: ' + newEmployee.password);
+        }
     }
     
-    // Check if employee ID already exists
-    if (employees.find(emp => emp.id === newEmployee.id)) {
-        alert('Employee ID already exists. Please choose a different ID.');
-        return;
-    }
-    
-    // Check if email already exists
-    if (employees.find(emp => emp.email === newEmployee.email)) {
-        alert('Email already registered. Please use a different email address.');
-        return;
-    }
-    
-    employees.push(newEmployee);
     saveToLocalStorage();
     loadEmployeeTable();
-
-    alert('Employee added successfully!\n\nUsername: ' + newEmployee.username + '\nPassword: ' + newEmployee.password);
     this.reset();
 });
 
@@ -1089,6 +1132,26 @@ function editEmployee(id) {
 // Delete employee
 function deleteEmployee(id) {
     if (confirm('Are you sure you want to delete this employee?')) {
+        const empToDelete = employees.find(emp => emp.id === id);
+        
+        if (currentUser && currentUser.role === 'manager') {
+            const approvalReq = {
+                id: 'PA' + Date.now(),
+                manager_id: currentUser.id,
+                manager_name: currentUser.name,
+                action_type: 'Delete Employee',
+                module: 'Employee Management',
+                details: `Deleting Employee: ${empToDelete ? empToDelete.name : id} (${id})`,
+                data: { id: id },
+                created_at: new Date().toISOString(),
+                status: 'pending'
+            };
+            pending_approvals.push(approvalReq);
+            saveToLocalStorage();
+            alert('Employee deletion request submitted for admin approval!');
+            return;
+        }
+        
         employees = employees.filter(emp => emp.id !== id);
         saveToLocalStorage();
         loadEmployeeTable();
@@ -1127,17 +1190,8 @@ function setupNavigation() {
                     loadComplaints();
                 } else if (targetId === 'leaves') {
                     loadLeaves();
-                    // Show manager form if appropriate
-                    const managerCard = document.getElementById('managerChangeRequestCard');
-                    if (managerCard) {
-                        if (currentUser.role === 'manager' || currentUser.role === 'hr' || currentUser.role === 'admin') {
-                            managerCard.classList.remove('hidden');
-                        } else {
-                            managerCard.classList.add('hidden');
-                        }
-                    }
-                } else if (targetId === 'admin_requests') {
-                    loadChangeRequests();
+                } else if (targetId === 'pending_approvals') {
+                    loadPendingApprovals();
                 }
             }
         });
@@ -1534,9 +1588,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 price: parseFloat(document.getElementById('orderPrice').value),
                 total: parseFloat(document.getElementById('orderTotal').value)
             };
-            
-            alert('Order created successfully! Order ID: ORD' + Math.floor(Math.random() * 1000));
-            saveToLocalStorage();
+            if (currentUser && currentUser.role === 'manager') {
+                const approvalReq = {
+                    id: 'PA' + Date.now(),
+                    manager_id: currentUser.id,
+                    manager_name: currentUser.name,
+                    action_type: 'Create Sales Order',
+                    module: 'Sales Management',
+                    details: `Customer: ${order.customer}, Product: ${order.product}, Total: ₹${order.total}`,
+                    data: order,
+                    created_at: new Date().toISOString(),
+                    status: 'pending'
+                };
+                pending_approvals.push(approvalReq);
+                saveToLocalStorage();
+                alert('Sales order request submitted for admin approval!');
+            } else {
+                // Currently orders aren't saved to an array in memory, they are just alerted.
+                // We maintain that behavior for admins (or we could save to a global array if it existed).
+                alert('Order created successfully! Order ID: ORD' + Math.floor(Math.random() * 1000));
+            }
             this.reset();
 
         });
@@ -2080,25 +2151,21 @@ window.updateLeaveStatus = function(leaveId, status) {
     }
 };
 
-function loadChangeRequests() {
-    const tbody = document.getElementById('changeRequestsTableBody');
+function loadPendingApprovals() {
+    const tbody = document.getElementById('pendingApprovalsTableBody');
     if (!tbody) return;
     
     tbody.innerHTML = '';
     
-    let displayReqs = [];
-    const isAdmin = currentUser && currentUser.role === 'admin';
-    
-    if (isAdmin) {
-        displayReqs = [...change_requests].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        document.querySelectorAll('.change-request-actions-col').forEach(el => el.classList.remove('hidden'));
-    } else {
-        displayReqs = change_requests.filter(r => r.manager_id === currentUser.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        document.querySelectorAll('.change-request-actions-col').forEach(el => el.classList.add('hidden'));
+    if (!currentUser || currentUser.role !== 'admin') {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center;">Access Denied.</td></tr>`;
+        return;
     }
     
+    let displayReqs = [...pending_approvals].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
     if (displayReqs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${isAdmin ? 7 : 6}" style="text-align: center;">No change requests found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center;">No pending approvals found.</td></tr>`;
         return;
     }
     
@@ -2109,10 +2176,10 @@ function loadChangeRequests() {
         else if (req.status === 'rejected') statusBadge = '<span class="badge badge-danger">Rejected</span>';
         
         let actionsHtml = '';
-        if (isAdmin && req.status === 'pending') {
+        if (req.status === 'pending') {
             actionsHtml = `
-                <button onclick="resolveChangeRequest('${req.id}', 'approved')" class="btn" style="padding: 4px 8px; font-size: 12px; background: #48bb78; color: white; margin-right: 4px;">Approve</button>
-                <button onclick="resolveChangeRequest('${req.id}', 'rejected')" class="btn" style="padding: 4px 8px; font-size: 12px; background: #f56565; color: white;">Reject</button>
+                <button onclick="approvePendingAction('${req.id}')" class="btn" style="padding: 4px 8px; font-size: 12px; background: #48bb78; color: white; margin-right: 4px;">Approve</button>
+                <button onclick="rejectPendingAction('${req.id}')" class="btn" style="padding: 4px 8px; font-size: 12px; background: #f56565; color: white;">Reject</button>
             `;
         }
         
@@ -2121,27 +2188,59 @@ function loadChangeRequests() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${req.manager_name}</td>
-            <td>${req.subject}</td>
-            <td>${req.description}</td>
-            <td>${statusBadge}</td>
+            <td>${req.action_type}</td>
+            <td>${req.module}</td>
+            <td>${req.details}</td>
             <td>${dateStr}</td>
-            <td>${req.admin_notes || '-'}</td>
-            ${isAdmin ? `<td>${actionsHtml}</td>` : ''}
+            <td>${statusBadge}</td>
+            <td>${actionsHtml}</td>
         `;
         tbody.appendChild(tr);
     });
 }
 
-window.resolveChangeRequest = function(reqId, status) {
-    const notes = prompt('Enter admin notes (optional):');
-    if (notes === null) return; // cancelled
+window.approvePendingAction = function(reqId) {
+    if (!confirm('Are you sure you want to approve this action?')) return;
     
-    const reqIndex = change_requests.findIndex(r => r.id === reqId);
+    const reqIndex = pending_approvals.findIndex(r => r.id === reqId);
     if (reqIndex >= 0) {
-        change_requests[reqIndex].status = status;
-        change_requests[reqIndex].admin_notes = notes || 'Processed by admin';
+        const req = pending_approvals[reqIndex];
+        req.status = 'approved';
+        
+        // Execute the action
+        if (req.action_type === 'Add Employee') {
+            employees.push(req.data);
+            alert('Employee added successfully!');
+        } else if (req.action_type === 'Edit Employee') {
+            const empIndex = employees.findIndex(e => e.id === req.data.id);
+            if (empIndex >= 0) {
+                req.data.attendance = employees[empIndex].attendance;
+                employees[empIndex] = req.data;
+            }
+            alert('Employee updated successfully!');
+        } else if (req.action_type === 'Delete Employee') {
+            employees = employees.filter(e => e.id !== req.data.id);
+            alert('Employee deleted successfully!');
+        } else if (req.action_type === 'Create Sales Order') {
+            // Orders aren't stored in memory in current implementation, but this handles the approval
+            alert('Sales order approved!');
+        }
+        
         saveToLocalStorage();
-        loadChangeRequests();
+        loadPendingApprovals();
+        // If they navigate back, the table should update
+        if (document.getElementById('employeeTableBody')) loadEmployeeTable();
+    }
+};
+
+window.rejectPendingAction = function(reqId) {
+    if (!confirm('Are you sure you want to reject this action?')) return;
+    
+    const reqIndex = pending_approvals.findIndex(r => r.id === reqId);
+    if (reqIndex >= 0) {
+        pending_approvals[reqIndex].status = 'rejected';
+        saveToLocalStorage();
+        loadPendingApprovals();
     }
 };
 
