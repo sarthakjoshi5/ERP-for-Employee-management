@@ -362,3 +362,23 @@ CREATE TABLE IF NOT EXISTS complaints (
     FOREIGN KEY (manager_id) REFERENCES employees(employee_id)
 );
 
+-- Admin Change Requests table
+CREATE TABLE IF NOT EXISTS admin_change_requests (
+    request_id INT AUTO_INCREMENT PRIMARY KEY,
+    manager_id INT NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    admin_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP NULL,
+    FOREIGN KEY (manager_id) REFERENCES employees(employee_id)
+);
+
+-- Insert Team Leader employee (ID 6)
+INSERT INTO employees (first_name, last_name, email, phone, department, designation, hire_date, salary) VALUES
+('Alex', 'TeamLead', 'alex.teamlead@company.com', '1231231234', 'Operations', 'Team Leader', '2023-04-01', 85000.00);
+
+-- Insert User for Team Leader
+INSERT INTO users (username, password, role, employee_id) VALUES
+('alex.teamlead', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'manager', 6);

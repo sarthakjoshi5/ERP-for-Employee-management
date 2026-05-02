@@ -1209,6 +1209,132 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Leave Management Section -->
+            <section id="leaves" class="content-section hidden">
+                <div class="content-header">
+                    <h1>Leave Management</h1>
+                    <p>Request leaves and manage approvals</p>
+                </div>
+
+                <!-- Employee Leave Form -->
+                <div class="card" id="leaveApplicationCard">
+                    <div class="card-header">
+                        <h3>Apply for Leave</h3>
+                        <p>Submit a new leave request</p>
+                    </div>
+                    <div class="card-body">
+                        <form id="applyLeaveForm">
+                            <div class="form-group">
+                                <label>Leave Type</label>
+                                <select id="leaveType" class="form-control" required>
+                                    <option value="sick">Sick Leave</option>
+                                    <option value="casual">Casual Leave</option>
+                                    <option value="annual">Annual Leave</option>
+                                    <option value="maternity">Maternity Leave</option>
+                                    <option value="paternity">Paternity Leave</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Start Date</label>
+                                <input type="date" id="leaveStartDate" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label>End Date</label>
+                                <input type="date" id="leaveEndDate" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Reason</label>
+                                <textarea id="leaveReason" class="form-control" rows="3" required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit Request</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Manager Change Request Form -->
+                <div class="card hidden" id="managerChangeRequestCard">
+                    <div class="card-header">
+                        <h3>Request Data Change (Admin Approval Required)</h3>
+                        <p>Submit a request to change employee or leave data</p>
+                    </div>
+                    <div class="card-body">
+                        <form id="changeRequestForm">
+                            <div class="form-group">
+                                <label>Subject</label>
+                                <input type="text" id="changeSubject" class="form-control" required placeholder="E.g., Modify Alex's leave dates">
+                            </div>
+                            <div class="form-group">
+                                <label>Description</label>
+                                <textarea id="changeDescription" class="form-control" rows="4" required placeholder="Provide details of what needs to be changed..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-warning">Request Admin Approval</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Leave Requests History</h3>
+                        <p>View all leave applications</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th>Type</th>
+                                        <th>Dates</th>
+                                        <th>Days</th>
+                                        <th>Reason</th>
+                                        <th>Status</th>
+                                        <th>Approver</th>
+                                        <th class="leave-actions-col hidden">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leavesTableBody">
+                                    <!-- Leaves will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Admin Change Requests Section -->
+            <section id="admin_requests" class="content-section hidden">
+                <div class="content-header">
+                    <h1>Admin Change Requests</h1>
+                    <p>Review data change requests from managers</p>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Pending & Resolved Requests</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Manager</th>
+                                        <th>Subject</th>
+                                        <th>Description</th>
+                                        <th>Status</th>
+                                        <th>Created At</th>
+                                        <th>Admin Notes</th>
+                                        <th class="change-request-actions-col hidden">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="changeRequestsTableBody">
+                                    <!-- Change requests will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
     </div>
 

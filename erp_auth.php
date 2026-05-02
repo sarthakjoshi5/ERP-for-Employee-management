@@ -1,19 +1,7 @@
 <?php
 session_start();
 
-// Database configuration
-$host = 'localhost';
-$dbname = 'erp_management';
-$username = 'root';
-$password = '';
-
-// Create database connection
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
-}
+require_once 'db_connection.php';
 
 // Handle login request
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

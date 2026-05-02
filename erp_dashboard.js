@@ -260,11 +260,17 @@ let products = [
 // Complaints database
 let complaints = [];
 
+// Leaves and Change Requests databases
+let leaves = [];
+let change_requests = [];
+
 // Persistence Functions
 function saveToLocalStorage() {
     localStorage.setItem('erp_employees', JSON.stringify(employees));
     localStorage.setItem('erp_products', JSON.stringify(products));
     localStorage.setItem('erp_complaints', JSON.stringify(complaints));
+    localStorage.setItem('erp_leaves', JSON.stringify(leaves));
+    localStorage.setItem('erp_change_requests', JSON.stringify(change_requests));
 }
 
 function loadFromLocalStorage() {
@@ -296,6 +302,22 @@ function loadFromLocalStorage() {
                 complaints = parsed;
             }
         } catch (e) { console.error('Error loading complaints:', e); }
+    }
+    
+    const savedLeaves = localStorage.getItem('erp_leaves');
+    if (savedLeaves) {
+        try {
+            const parsed = JSON.parse(savedLeaves);
+            if (Array.isArray(parsed)) leaves = parsed;
+        } catch(e) {}
+    }
+    
+    const savedChangeRequests = localStorage.getItem('erp_change_requests');
+    if (savedChangeRequests) {
+        try {
+            const parsed = JSON.parse(savedChangeRequests);
+            if (Array.isArray(parsed)) change_requests = parsed;
+        } catch(e) {}
     }
 }
 
@@ -695,11 +717,11 @@ function setupMenu(role) {
     const menu = document.getElementById('sidebarMenu');
     menu.innerHTML = '';
     
-    // Common items for all users
     const commonItems = [
         { href: '#dashboard', text: 'Dashboard' },
         { href: '#myProfile', text: 'My Profile' },
         { href: '#attendance', text: 'Attendance' },
+        { href: '#leaves', text: 'Leave Management' },
         { href: '#payroll', text: 'Payroll' },
         { href: '#complaints', text: 'Complaints' }
     ];
@@ -708,13 +730,15 @@ function setupMenu(role) {
         { href: '#employees', text: 'Employee Management' },
         { href: '#inventory', text: 'Inventory Management' },
         { href: '#sales', text: 'Sales Management' },
-        { href: '#reports', text: 'Reports & Analytics' }
+        { href: '#reports', text: 'Reports & Analytics' },
+        { href: '#admin_requests', text: 'Admin Change Requests' }
     ];
     
     const managerItems = [
         { href: '#employees', text: 'Employee Management' },
         { href: '#sales', text: 'Sales Management' },
-        { href: '#reports', text: 'Reports & Analytics' }
+        { href: '#reports', text: 'Reports & Analytics' },
+        { href: '#admin_requests', text: 'Admin Change Requests' }
     ];
     
     // Add common items (My Profile is now available to everyone)
@@ -1101,6 +1125,19 @@ function setupNavigation() {
                 // Special handling for complaints section
                 if (targetId === 'complaints') {
                     loadComplaints();
+                } else if (targetId === 'leaves') {
+                    loadLeaves();
+                    // Show manager form if appropriate
+                    const managerCard = document.getElementById('managerChangeRequestCard');
+                    if (managerCard) {
+                        if (currentUser.role === 'manager' || currentUser.role === 'hr' || currentUser.role === 'admin') {
+                            managerCard.classList.remove('hidden');
+                        } else {
+                            managerCard.classList.add('hidden');
+                        }
+                    }
+                } else if (targetId === 'admin_requests') {
+                    loadChangeRequests();
                 }
             }
         });
@@ -1890,4 +1927,221 @@ async function saveComplaintAction() {
         alert('Failed to update status.');
     }
 }
+
+// ==========================================
+// Leave Management Functions
+// ==========================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    const applyLeaveForm = document.getElementById('applyLeaveForm');
+    if (applyLeaveForm) {
+        applyLeaveForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const type = document.getElementById('leaveType').value;
+            const startDate = document.getElementById('leaveStartDate').value;
+            const endDate = document.getElementById('leaveEndDate').value;
+            const reason = document.getElementById('leaveReason').value;
+            
+            if (!startDate || !endDate || !reason) {
+                alert('Please fill in all fields.');
+                return;
+            }
+            
+            // Calculate days
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            if (end < start) {
+                alert('End date cannot be before start date.');
+                return;
+            }
+            
+            const diffTime = Math.abs(end - start);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            
+            const newLeave = {
+                id: 'LV' + Date.now(),
+                employee_id: currentUser.id,
+                employee_name: currentUser.name,
+                type: type,
+                start_date: startDate,
+                end_date: endDate,
+                days: diffDays,
+                reason: reason,
+                status: 'pending',
+                created_at: new Date().toISOString()
+            };
+            
+            leaves.push(newLeave);
+            saveToLocalStorage();
+            
+            alert('Leave request submitted successfully.');
+            applyLeaveForm.reset();
+            loadLeaves();
+        });
+    }
+
+    const changeRequestForm = document.getElementById('changeRequestForm');
+    if (changeRequestForm) {
+        changeRequestForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const subject = document.getElementById('changeSubject').value;
+            const description = document.getElementById('changeDescription').value;
+            
+            if (!subject || !description) {
+                alert('Please fill in all fields.');
+                return;
+            }
+            
+            const newReq = {
+                id: 'CR' + Date.now(),
+                manager_id: currentUser.id,
+                manager_name: currentUser.name,
+                subject: subject,
+                description: description,
+                status: 'pending',
+                created_at: new Date().toISOString()
+            };
+            
+            change_requests.push(newReq);
+            saveToLocalStorage();
+            
+            alert('Change request submitted to Admin successfully.');
+            changeRequestForm.reset();
+            loadChangeRequests();
+        });
+    }
+});
+
+function loadLeaves() {
+    const tbody = document.getElementById('leavesTableBody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    // Determine which leaves to show
+    let displayLeaves = [];
+    const isApprover = currentUser && (currentUser.role === 'manager' || currentUser.role === 'hr' || currentUser.role === 'admin');
+    
+    if (isApprover) {
+        displayLeaves = [...leaves].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        // Show actions column
+        document.querySelectorAll('.leave-actions-col').forEach(el => el.classList.remove('hidden'));
+    } else {
+        displayLeaves = leaves.filter(l => l.employee_id === currentUser.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        document.querySelectorAll('.leave-actions-col').forEach(el => el.classList.add('hidden'));
+    }
+    
+    if (displayLeaves.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${isApprover ? 8 : 7}" style="text-align: center;">No leave requests found.</td></tr>`;
+        return;
+    }
+    
+    displayLeaves.forEach(leave => {
+        let statusBadge = '';
+        if (leave.status === 'pending') statusBadge = '<span class="badge badge-warning">Pending</span>';
+        else if (leave.status === 'approved') statusBadge = '<span class="badge badge-success">Approved</span>';
+        else if (leave.status === 'rejected') statusBadge = '<span class="badge badge-danger">Rejected</span>';
+        
+        let actionsHtml = '';
+        if (isApprover && leave.status === 'pending') {
+            actionsHtml = `
+                <button onclick="updateLeaveStatus('${leave.id}', 'approved')" class="btn" style="padding: 4px 8px; font-size: 12px; background: #48bb78; color: white; margin-right: 4px;">Approve</button>
+                <button onclick="updateLeaveStatus('${leave.id}', 'rejected')" class="btn" style="padding: 4px 8px; font-size: 12px; background: #f56565; color: white;">Reject</button>
+            `;
+        }
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${leave.employee_name}</td>
+            <td style="text-transform: capitalize;">${leave.type}</td>
+            <td>${leave.start_date} to ${leave.end_date}</td>
+            <td>${leave.days}</td>
+            <td>${leave.reason}</td>
+            <td>${statusBadge}</td>
+            <td>${leave.approver_name || '-'}</td>
+            ${isApprover ? `<td>${actionsHtml}</td>` : ''}
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+window.updateLeaveStatus = function(leaveId, status) {
+    if (!confirm('Are you sure you want to ' + status + ' this leave?')) return;
+    
+    const leaveIndex = leaves.findIndex(l => l.id === leaveId);
+    if (leaveIndex >= 0) {
+        leaves[leaveIndex].status = status;
+        leaves[leaveIndex].approver_name = currentUser.name;
+        leaves[leaveIndex].approver_id = currentUser.id;
+        saveToLocalStorage();
+        loadLeaves();
+    }
+};
+
+function loadChangeRequests() {
+    const tbody = document.getElementById('changeRequestsTableBody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    let displayReqs = [];
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    
+    if (isAdmin) {
+        displayReqs = [...change_requests].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        document.querySelectorAll('.change-request-actions-col').forEach(el => el.classList.remove('hidden'));
+    } else {
+        displayReqs = change_requests.filter(r => r.manager_id === currentUser.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        document.querySelectorAll('.change-request-actions-col').forEach(el => el.classList.add('hidden'));
+    }
+    
+    if (displayReqs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${isAdmin ? 7 : 6}" style="text-align: center;">No change requests found.</td></tr>`;
+        return;
+    }
+    
+    displayReqs.forEach(req => {
+        let statusBadge = '';
+        if (req.status === 'pending') statusBadge = '<span class="badge badge-warning">Pending</span>';
+        else if (req.status === 'approved') statusBadge = '<span class="badge badge-success">Approved</span>';
+        else if (req.status === 'rejected') statusBadge = '<span class="badge badge-danger">Rejected</span>';
+        
+        let actionsHtml = '';
+        if (isAdmin && req.status === 'pending') {
+            actionsHtml = `
+                <button onclick="resolveChangeRequest('${req.id}', 'approved')" class="btn" style="padding: 4px 8px; font-size: 12px; background: #48bb78; color: white; margin-right: 4px;">Approve</button>
+                <button onclick="resolveChangeRequest('${req.id}', 'rejected')" class="btn" style="padding: 4px 8px; font-size: 12px; background: #f56565; color: white;">Reject</button>
+            `;
+        }
+        
+        const dateStr = new Date(req.created_at).toLocaleDateString();
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${req.manager_name}</td>
+            <td>${req.subject}</td>
+            <td>${req.description}</td>
+            <td>${statusBadge}</td>
+            <td>${dateStr}</td>
+            <td>${req.admin_notes || '-'}</td>
+            ${isAdmin ? `<td>${actionsHtml}</td>` : ''}
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+window.resolveChangeRequest = function(reqId, status) {
+    const notes = prompt('Enter admin notes (optional):');
+    if (notes === null) return; // cancelled
+    
+    const reqIndex = change_requests.findIndex(r => r.id === reqId);
+    if (reqIndex >= 0) {
+        change_requests[reqIndex].status = status;
+        change_requests[reqIndex].admin_notes = notes || 'Processed by admin';
+        saveToLocalStorage();
+        loadChangeRequests();
+    }
+};
 

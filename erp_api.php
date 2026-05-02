@@ -4,18 +4,7 @@ require_once 'erp_auth.php';
 // Ensure user is logged in
 requireLogin();
 
-// Database connection
-$host = 'localhost';
-$dbname = 'erp_management';
-$username = 'root';
-$password = '';
-
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
-}
+require_once 'db_connection.php';
 
 $action = $_GET['action'] ?? '';
 
@@ -59,180 +48,29 @@ switch($action) {
     case 'delete_complaint':
         deleteComplaint();
         break;
-    default:
-        echo json_encode(['success' => false, 'message' => 'Invalid action']);
+    case 'submit_leave':
+        submitLeave();
         break;
-}
-
-function getDashboardStats() {
-    global $pdo;
-    
-    try {
-        $stats = [];
-        
-        // Get total products
-        $stmt = $pdo->query("SELECT COUNT(*) as count FROM products");
-        $stats['total_products'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
-        
-        // Get total revenue
-        $stmt = $pdo->query("SELECT SUM(total_amount) as total FROM orders WHERE status = 'delivered'");
-        $stats['total_revenue'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
-        
-        // Get total employees
-        $stmt = $pdo->query("SELECT COUNT(*) as count FROM employees");
-        $stats['total_employees'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
-        
-        // Get pending orders
-        $stmt = $pdo->query("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'");
-        $stats['pending_orders'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
-        
-        echo json_encode(['success' => true, 'data' => $stats]);
-    } catch(PDOException $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-}
-
-function getEmployees() {
-    global $pdo;
-    
-    try {
-        $stmt = $pdo->query("SELECT * FROM employees ORDER BY name");
-        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode(['success' => true, 'data' => $employees]);
-    } catch(PDOException $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-}
-
-function getInventory() {
-    global $pdo;
-    
-    try {
-        $stmt = $pdo->query("SELECT * FROM products ORDER BY name");
-        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode(['success' => true, 'data' => $products]);
-    } catch(PDOException $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-}
-
-function getSales() {
-    global $pdo;
-    
-    try {
-        $stmt = $pdo->query("SELECT * FROM orders ORDER BY order_date DESC");
-        $sales = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode(['success' => true, 'data' => $sales]);
-    } catch(PDOException $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-}
-
-function getAttendance() {
-    global $pdo;
-    
-    try {
-        $stmt = $pdo->query("SELECT * FROM attendance WHERE date = CURDATE() ORDER BY check_in");
-        $attendance = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode(['success' => true, 'data' => $attendance]);
-    } catch(PDOException $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-}
-
-function getPayroll() {
-    global $pdo;
-    
-    try {
-        $stmt = $pdo->query("SELECT * FROM payroll WHERE month = MONTH(CURDATE()) AND year = YEAR(CURDATE())");
-        $payroll = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode(['success' => true, 'data' => $payroll]);
-    } catch(PDOException $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-}
-
-function getRecentActivities() {
-    global $pdo;
-    
-    try {
-        $stmt = $pdo->query("SELECT * FROM orders ORDER BY order_date DESC LIMIT 5");
-        $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode(['success' => true, 'data' => $activities]);
-    } catch(PDOException $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-}
-
-function generatePayroll() {
-    global $pdo;
-    
-    try {
-        $current_month = date('Y-m-01');
-        
-        // Get all active employees
-        $stmt = $pdo->query("SELECT * FROM employees WHERE status = 'active'");
-        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        foreach ($employees as $employee) {
-            // Calculate payroll (basic + allowances - deductions)
-            $basic_salary = $employee['salary'];
-            $allowances = $basic_salary * 0.2; // 20% allowances
-            $deductions = $basic_salary * 0.1; // 10% deductions
-            $net_salary = $basic_salary + $allowances - $deductions;
-            
-            // Insert payroll record
-            $payroll_stmt = $pdo->prepare("
-                INSERT INTO payroll (employee_id, month, basic_salary, allowances, deductions, net_salary, status) 
-                VALUES (?, ?, ?, ?, ?, 'generated')
-            ");
-            $payroll_stmt->execute([
-                $employee['id'],
-                $current_month,
-                $basic_salary,
-                $allowances,
-                $deductions,
-                $net_salary
-            ]);
-        }
-        
-        echo json_encode(['success' => true, 'message' => 'Payroll generated successfully']);
-    } catch(PDOException $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-}
-
-function processPayment() {
-    global $pdo;
-    
-    try {
-        $employee_id = $_POST['employee_id'] ?? '';
-        $amount = $_POST['amount'] ?? '';
-        
-        if (empty($employee_id) || empty($amount)) {
-            echo json_encode(['success' => false, 'message' => 'Missing required fields']);
-            return;
-        }
-        
-        // Update payroll status
-        $stmt = $pdo->prepare("
-            UPDATE payroll SET status = 'paid', payment_date = CURDATE() 
-            WHERE employee_id = ? AND month = MONTH(CURDATE()) AND year = YEAR(CURDATE())
-        ");
-        $stmt->execute([$employee_id]);
-        
-        echo json_encode(['success' => true, 'message' => 'Payment processed successfully']);
-    } catch(PDOException $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-}
-?>
-        processPayment();
+    case 'get_leaves':
+        getLeaves();
+        break;
+    case 'update_leave_status':
+        updateLeaveStatus();
+        break;
+    case 'submit_change_request':
+        submitChangeRequest();
+        break;
+    case 'get_change_requests':
+        getChangeRequests();
+        break;
+    case 'resolve_change_request':
+        resolveChangeRequest();
         break;
     default:
         echo json_encode(['success' => false, 'message' => 'Invalid action']);
         break;
 }
+
 
 // Get dashboard statistics
 function getDashboardStats() {
@@ -712,6 +550,205 @@ function deleteComplaint() {
         $stmt->execute([$complaintId]);
         
         echo json_encode(['success' => true, 'message' => 'Complaint removed successfully']);
+    } catch(PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+// ==========================================
+// Leave Management Functions
+// ==========================================
+
+function submitLeave() {
+    global $pdo;
+    
+    try {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $leave_type = $data['leave_type'] ?? '';
+        $start_date = $data['start_date'] ?? '';
+        $end_date = $data['end_date'] ?? '';
+        $reason = $data['reason'] ?? '';
+        $employee_id = $_SESSION['employee_id'] ?? null;
+        
+        if (empty($leave_type) || empty($start_date) || empty($end_date) || empty($reason) || empty($employee_id)) {
+            echo json_encode(['success' => false, 'message' => 'Missing required fields or session expired']);
+            return;
+        }
+        
+        // Calculate days count
+        $start = new DateTime($start_date);
+        $end = new DateTime($end_date);
+        $diff = $start->diff($end);
+        $days_count = $diff->days + 1; // Inclusive of start date
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, days_count, reason) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+        
+        $stmt->execute([$employee_id, $leave_type, $start_date, $end_date, $days_count, $reason]);
+        
+        echo json_encode(['success' => true, 'message' => 'Leave request submitted successfully']);
+    } catch(PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+function getLeaves() {
+    global $pdo;
+    
+    try {
+        $role = $_SESSION['role'] ?? '';
+        $employee_id = $_SESSION['employee_id'] ?? null;
+        
+        if ($role === 'employee') {
+            // Employee sees their own leaves
+            $stmt = $pdo->prepare("
+                SELECT l.*, CONCAT(e.first_name, ' ', e.last_name) as employee_name, CONCAT(a.first_name, ' ', a.last_name) as approver_name
+                FROM leave_requests l
+                JOIN employees e ON l.employee_id = e.employee_id
+                LEFT JOIN employees a ON l.approved_by = a.employee_id
+                WHERE l.employee_id = ?
+                ORDER BY l.start_date DESC
+            ");
+            $stmt->execute([$employee_id]);
+        } else {
+            // Managers, HR, Admins see all leaves
+            $stmt = $pdo->query("
+                SELECT l.*, CONCAT(e.first_name, ' ', e.last_name) as employee_name, CONCAT(a.first_name, ' ', a.last_name) as approver_name
+                FROM leave_requests l
+                JOIN employees e ON l.employee_id = e.employee_id
+                LEFT JOIN employees a ON l.approved_by = a.employee_id
+                ORDER BY l.start_date DESC
+            ");
+        }
+        
+        $leaves = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'leaves' => $leaves]);
+    } catch(PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+function updateLeaveStatus() {
+    global $pdo;
+    
+    try {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $leave_id = $data['leave_id'] ?? 0;
+        $status = $data['status'] ?? ''; // 'approved' or 'rejected'
+        $manager_id = $_SESSION['employee_id'] ?? null;
+        
+        if (empty($leave_id) || empty($status) || !in_array($_SESSION['role'], ['admin', 'manager', 'hr'])) {
+            echo json_encode(['success' => false, 'message' => 'Unauthorized or missing data']);
+            return;
+        }
+        
+        $stmt = $pdo->prepare("
+            UPDATE leave_requests 
+            SET status = ?, approved_by = ?, approved_at = NOW()
+            WHERE leave_id = ?
+        ");
+        
+        $stmt->execute([$status, $manager_id, $leave_id]);
+        echo json_encode(['success' => true, 'message' => 'Leave status updated successfully']);
+    } catch(PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+// ==========================================
+// Admin Change Request Functions
+// ==========================================
+
+function submitChangeRequest() {
+    global $pdo;
+    
+    try {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $subject = $data['subject'] ?? '';
+        $description = $data['description'] ?? '';
+        $manager_id = $_SESSION['employee_id'] ?? null;
+        
+        if (empty($subject) || empty($description) || empty($manager_id)) {
+            echo json_encode(['success' => false, 'message' => 'Missing required fields or session expired']);
+            return;
+        }
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO admin_change_requests (manager_id, subject, description) 
+            VALUES (?, ?, ?)
+        ");
+        
+        $stmt->execute([$manager_id, $subject, $description]);
+        
+        echo json_encode(['success' => true, 'message' => 'Change request submitted to Admin']);
+    } catch(PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+function getChangeRequests() {
+    global $pdo;
+    
+    try {
+        $role = $_SESSION['role'] ?? '';
+        $manager_id = $_SESSION['employee_id'] ?? null;
+        
+        if ($role === 'admin') {
+            // Admin sees all requests
+            $stmt = $pdo->query("
+                SELECT c.*, CONCAT(e.first_name, ' ', e.last_name) as manager_name
+                FROM admin_change_requests c
+                JOIN employees e ON c.manager_id = e.employee_id
+                ORDER BY c.created_at DESC
+            ");
+        } else {
+            // Managers see only their own requests
+            $stmt = $pdo->prepare("
+                SELECT c.*, CONCAT(e.first_name, ' ', e.last_name) as manager_name
+                FROM admin_change_requests c
+                JOIN employees e ON c.manager_id = e.employee_id
+                WHERE c.manager_id = ?
+                ORDER BY c.created_at DESC
+            ");
+            $stmt->execute([$manager_id]);
+        }
+        
+        $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'requests' => $requests]);
+    } catch(PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+function resolveChangeRequest() {
+    global $pdo;
+    
+    try {
+        if ($_SESSION['role'] !== 'admin') {
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            return;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $request_id = $data['request_id'] ?? 0;
+        $status = $data['status'] ?? 'approved';
+        $admin_notes = $data['admin_notes'] ?? '';
+        
+        if (empty($request_id)) {
+            echo json_encode(['success' => false, 'message' => 'Missing request ID']);
+            return;
+        }
+        
+        $stmt = $pdo->prepare("
+            UPDATE admin_change_requests 
+            SET status = ?, admin_notes = ?, resolved_at = NOW()
+            WHERE request_id = ?
+        ");
+        
+        $stmt->execute([$status, $admin_notes, $request_id]);
+        echo json_encode(['success' => true, 'message' => 'Change request resolved']);
     } catch(PDOException $e) {
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
