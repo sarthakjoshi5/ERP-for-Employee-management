@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Management System - Dashboard</title>
+    
+    <!-- Google Fonts: Inter and Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <link rel="stylesheet" href="erp_style.css">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --surface-glass: rgba(255, 255, 255, 0.7);
+            --surface-border: rgba(255, 255, 255, 0.5);
+            --text-heading: #111827;
+            --text-body: #4b5563;
+        }
+
+        body.dark-mode {
+            --surface-glass: rgba(17, 24, 39, 0.7);
+            --surface-border: rgba(255, 255, 255, 0.1);
+            --text-heading: #f9fafb;
+            --text-body: #d1d5db;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%) !important;
+            min-height: 100vh;
+            color: var(--text-body) !important;
+            overflow-x: hidden;
+            transition: background 0.3s ease;
+        }
+
+        body.dark-mode {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+        }
+
+        /* Abstract Background Elements */
+        .bg-shape {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(100px);
+            z-index: -1;
+            opacity: 0.6;
+        }
+        .shape-1 {
+            top: -100px;
+            left: -100px;
+            width: 500px;
+            height: 500px;
+            background: #a78bfa;
+        }
+        .shape-2 {
+            bottom: -150px;
+            right: -50px;
+            width: 600px;
+            height: 600px;
+            background: #60a5fa;
+        }
+        body.dark-mode .shape-1 { background: #4c1d95; }
+        body.dark-mode .shape-2 { background: #1e3a8a; }
+
+        /* Navigation */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background: var(--surface-glass);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--surface-border);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+        }
+        .logo {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--text-heading);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .nav-links {
+            display: flex;
+            gap: 30px;
+        }
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-body);
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* Hero Section */
+        .hero {
+            padding: 160px 20px 80px;
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .hero h1 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 4.5rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 20px;
+            background: linear-gradient(to right, #4f46e5, #ec4899);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -1px;
+        }
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-body);
+            margin-bottom: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            font-family: 'Inter', sans-serif;
+            padding: 16px 32px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid transparent;
+            cursor: pointer;
+        }
+        .btn-green {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+        .btn-orange {
+            background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+            color: white;
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.3);
+        }
+        .btn-blue {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+        }
+        .btn:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        /* Features Grid */
+        .features-section {
+            max-width: 1200px;
+            margin: 0 auto 100px;
+            padding: 0 20px;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+        }
+        .feature-card {
+            background: var(--surface-glass);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--surface-border);
+            border-radius: 24px;
+            padding: 40px 30px;
+            text-align: left;
+            transition: all 0.4s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        }
+        body.dark-mode .feature-card {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        .feature-card:hover {
+            transform: translateY(-10px);
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        body.dark-mode .feature-card:hover {
+            background: rgba(30, 41, 59, 0.9);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+        .icon-wrapper {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            color: #4f46e5;
+        }
+        body.dark-mode .icon-wrapper {
+            background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%);
+            color: #818cf8;
+        }
+        .feature-card h3 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.25rem;
+            color: var(--text-heading);
+            margin-bottom: 12px;
+        }
+        .feature-card p {
+            color: var(--text-body);
+            line-height: 1.6;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px;
+            border-top: 1px solid var(--surface-border);
+            color: var(--text-body);
+        }
+
+        /* Theme Toggle overrides */
+        .theme-toggle-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--surface-glass) !important;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--surface-border) !important;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            color: var(--text-heading);
+        }
+        .theme-toggle-btn:hover {
+            transform: translateY(-5px);
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 3rem; }
+            .action-buttons { flex-direction: column; }
+            .btn { width: 100%; justify-content: center; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+
+    <nav class="navbar">
+        <div class="logo">
+            <i data-lucide="blocks"></i>
+            ERPFlow
+        </div>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="erp_with_employee_login.html">Solutions</a>
+            <a href="erp_with_employee_login.html">Pricing</a>
+        </div>
+        <div>
+            <a href="erp_with_employee_login.html?mode=employee" style="text-decoration:none; font-weight:600; color:var(--text-heading);">Login</a>
+        </div>
+    </nav>
+
+    <div class="hero">
+        <h1>ERP Management System</h1>
+        <p>A complete, intelligent business management solution designed for modern teams. Streamline your workflow with elegance.</p>
+        
+        <div class="action-buttons">
+            <a href="erp_with_employee_login.html?mode=employee" class="btn btn-green">
+                <i data-lucide="users"></i> Employee Login
+            </a>
+            <a href="erp_with_employee_login.html?mode=admin" class="btn btn-orange">
+                <i data-lucide="shield"></i> Admin Login
+            </a>
+            <a href="erp_with_employee_login.html?mode=signup" class="btn btn-blue">
+                <i data-lucide="user-plus"></i> Sign Up
+            </a>
+        </div>
+    </div>
+
+    <div class="features-section" id="features">
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="icon-wrapper"><i data-lucide="users"></i></div>
+                <h3>Employee Management</h3>
+                <p>Complete workforce administration tools with role-based access control and comprehensive employee data management.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="icon-wrapper"><i data-lucide="bar-chart-3"></i></div>
+                <h3>Analytics & Reports</h3>
+                <p>Real-time insights, performance metrics, and comprehensive reporting tools for data-driven decision making.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="icon-wrapper"><i data-lucide="clock"></i></div>
+                <h3>Attendance Tracking</h3>
+                <p>Advanced attendance system with visual charts, automated time tracking, and comprehensive leave management.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="icon-wrapper"><i data-lucide="wallet"></i></div>
+                <h3>Payroll System</h3>
+                <p>Automated salary calculations, tax management, and comprehensive compensation tracking with detailed reporting.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="icon-wrapper"><i data-lucide="package"></i></div>
+                <h3>Inventory Control</h3>
+                <p>Real-time stock monitoring, automated reorder alerts, and comprehensive supply chain management tools.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="icon-wrapper"><i data-lucide="shopping-cart"></i></div>
+                <h3>Sales Management</h3>
+                <p>Complete order processing, customer relationship management, and sales analytics with performance tracking.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>© 2024 ERPFlow | Powered by Advanced Technology</p>
+    </div>
+
+    <button id="themeToggle" class="theme-toggle-btn" title="Toggle Dark Mode">🌙</button>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Dark Mode Toggle Logic
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeToggleBtn = document.getElementById('themeToggle');
+            if (themeToggleBtn) {
+                const currentTheme = localStorage.getItem('theme');
+                if (currentTheme === 'dark') {
+                    document.body.classList.add('dark-mode');
+                    themeToggleBtn.innerHTML = '<i data-lucide="sun"></i>';
+                    themeToggleBtn.title = 'Toggle Light Mode';
+                } else {
+                    themeToggleBtn.innerHTML = '<i data-lucide="moon"></i>';
+                }
+                
+                // Re-initialize icons for the toggle button
+                lucide.createIcons();
+                
+                themeToggleBtn.addEventListener('click', function() {
+                    document.body.classList.toggle('dark-mode');
+                    let theme = 'light';
+                    if (document.body.classList.contains('dark-mode')) {
+                        theme = 'dark';
+                        themeToggleBtn.innerHTML = '<i data-lucide="sun"></i>';
+                        themeToggleBtn.title = 'Toggle Light Mode';
+                    } else {
+                        themeToggleBtn.innerHTML = '<i data-lucide="moon"></i>';
+                        themeToggleBtn.title = 'Toggle Dark Mode';
+                    }
+                    localStorage.setItem('theme', theme);
+                    lucide.createIcons();
+                });
+            }
+        });
+    </script>
+</body>
+</html>
