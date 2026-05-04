@@ -37,14 +37,7 @@ $password = 'your_password';
 ### 3. Access the System
 Open your browser and navigate to: `http://localhost/erp_system/erp_login.html`
 
-## 🔑 Login Credentials
 
-| Role | Username | Password |
-|------|----------|----------|
-| Admin | Sarthak | pass123 |
-| HR | Vaishnavi | pass123 |
-| Finance | Haripriya | pass123 |
-| Manager | Akash | pass123 |
 
 ## 📊 ERP Modules
 
@@ -112,12 +105,7 @@ Open your browser and navigate to: `http://localhost/erp_system/erp_login.html`
 - **Database**: MySQL 5.7+
 - **Authentication**: Session-based with password hashing
 
-## 📱 Browser Support
 
-- Chrome 60+
-- Firefox 55+
-- Safari 12+
-- Edge 79+
 
 ## 🛠️ File Structure
 
