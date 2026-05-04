@@ -1,5 +1,6 @@
 // ERP Management System JavaScript
-// Employee database (in real app, this would be server-side)
+// Employee database — synced from MySQL via erp_employees_api.php (localStorage fallback)
+const EMP_API = 'erp_employees_api.php';
 let employees = [
     {
         id: 'EMP001',
@@ -263,7 +264,9 @@ let complaints = [];
 // Leaves database
 let leaves = [];
 
+// ──────────────────────────────────────────────────────────
 // Persistence Functions
+// ──────────────────────────────────────────────────────────
 function saveToLocalStorage() {
     localStorage.setItem('erp_employees', JSON.stringify(employees));
     localStorage.setItem('erp_products', JSON.stringify(products));
@@ -273,47 +276,58 @@ function saveToLocalStorage() {
 
 function loadFromLocalStorage() {
     const savedEmployees = localStorage.getItem('erp_employees');
-    const savedProducts = localStorage.getItem('erp_products');
-    
+    const savedProducts  = localStorage.getItem('erp_products');
+
     if (savedEmployees) {
         try {
             const parsed = JSON.parse(savedEmployees);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                employees = parsed;
-            }
-        } catch (e) { console.error('Error loading employees:', e); }
+            if (Array.isArray(parsed) && parsed.length > 0) employees = parsed;
+        } catch (e) { console.error('Error loading employees from localStorage:', e); }
     }
     if (savedProducts) {
         try {
             const parsed = JSON.parse(savedProducts);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                products = parsed;
-            }
+            if (Array.isArray(parsed) && parsed.length > 0) products = parsed;
         } catch (e) { console.error('Error loading products:', e); }
     }
-    
+
     const savedComplaints = localStorage.getItem('erp_complaints');
     if (savedComplaints) {
         try {
             const parsed = JSON.parse(savedComplaints);
-            if (Array.isArray(parsed)) {
-                complaints = parsed;
-            }
+            if (Array.isArray(parsed)) complaints = parsed;
         } catch (e) { console.error('Error loading complaints:', e); }
     }
-    
+
     const savedLeaves = localStorage.getItem('erp_leaves');
     if (savedLeaves) {
         try {
             const parsed = JSON.parse(savedLeaves);
             if (Array.isArray(parsed)) leaves = parsed;
-        } catch(e) {}
+        } catch (e) {}
     }
-    
 }
 
-// Initialize persistence
+// Sync employees from MySQL database (falls back silently if PHP is unavailable)
+function syncEmployeesFromDB() {
+    fetch(EMP_API + '?action=get_all')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && Array.isArray(data.employees) && data.employees.length > 0) {
+                employees = data.employees;
+                saveToLocalStorage();
+                // Refresh employee table if it is currently visible
+                const tbl = document.getElementById('employeeTableBody');
+                if (tbl) loadEmployeeTable();
+                console.log('[DB] Synced', employees.length, 'employees from MySQL.');
+            }
+        })
+        .catch(() => console.log('[DB] PHP server unavailable — using localStorage data.'));
+}
+
+// Initialize persistence then sync from DB
 loadFromLocalStorage();
+document.addEventListener('DOMContentLoaded', syncEmployeesFromDB);
 
 // Handle mode from URL parameters
 document.addEventListener('DOMContentLoaded', function() {
@@ -1011,54 +1025,70 @@ function loadEmployeeTable() {
     });
 }
 
-// Add employee
-document.getElementById('addEmployeeForm').addEventListener('submit', function(e) {
+// ──────────────────────────────────────────────────────────
+// Add / Edit Employee (localStorage + MySQL DB)
+// ──────────────────────────────────────────────────────────
+document.getElementById('addEmployeeForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    
+
     const newEmployee = {
-        id: document.getElementById('empId').value,
-        username: document.getElementById('empUsername').value,
-        password: document.getElementById('empPassword').value,
-        name: document.getElementById('empName').value,
-        email: document.getElementById('empEmail').value,
-        department: document.getElementById('empDept').value,
-        designation: document.getElementById('empDesignation').value,
-        role: document.getElementById('empRole').value,
-        salary: parseFloat(document.getElementById('empSalary').value),
-        status: 'active',
-        attendance: []
+        id:          document.getElementById('empId').value.trim(),
+        username:    document.getElementById('empUsername').value.trim(),
+        password:    document.getElementById('empPassword').value.trim(),
+        name:        document.getElementById('empName').value.trim(),
+        email:       document.getElementById('empEmail').value.trim(),
+        department:  document.getElementById('empDept').value.trim(),
+        designation: document.getElementById('empDesignation').value.trim(),
+        role:        document.getElementById('empRole').value.trim(),
+        salary:      parseFloat(document.getElementById('empSalary').value),
+        status:      'active',
+        attendance:  []
     };
 
-    
-    // Check if employee already exists (Edit Mode)
     const existingIndex = employees.findIndex(emp => emp.id === newEmployee.id);
-    
-    if (existingIndex >= 0) {
-        // Edit mode
-        // Keep existing attendance
+    const isEditMode    = existingIndex >= 0;
+
+    if (isEditMode) {
         newEmployee.attendance = employees[existingIndex].attendance;
         employees[existingIndex] = newEmployee;
-        alert('Employee updated successfully!');
     } else {
-        // Add mode
-        // Check if username already exists
         if (employees.find(emp => emp.username === newEmployee.username)) {
             alert('Username already exists. Please choose a different username.');
             return;
         }
-        
-        // Check if email already exists
         if (employees.find(emp => emp.email === newEmployee.email)) {
             alert('Email already registered. Please use a different email address.');
             return;
         }
-        
         employees.push(newEmployee);
-        alert('Employee added successfully!\n\nUsername: ' + newEmployee.username + '\nPassword: ' + newEmployee.password);
     }
-    
+
+    // Persist to localStorage immediately
     saveToLocalStorage();
     loadEmployeeTable();
+
+    // Sync to MySQL DB (non-blocking)
+    const apiAction = isEditMode ? 'edit' : 'add';
+    try {
+        const res  = await fetch(EMP_API + '?action=' + apiAction, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(newEmployee)
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert(isEditMode
+                ? 'Employee updated successfully! (saved to database)'
+                : 'Employee added successfully!\n\nUsername: ' + newEmployee.username + '\nPassword: ' + newEmployee.password + '\n\n✅ Saved to database');
+        } else {
+            alert((isEditMode ? 'Employee updated locally.' : 'Employee added locally.') + '\n⚠ DB sync: ' + data.message);
+        }
+    } catch {
+        alert(isEditMode
+            ? 'Employee updated (localStorage only — DB server unavailable).'
+            : 'Employee added (localStorage only — DB server unavailable).\n\nUsername: ' + newEmployee.username + '\nPassword: ' + newEmployee.password);
+    }
+
     this.reset();
 });
 
@@ -1081,13 +1111,30 @@ function editEmployee(id) {
     }
 }
 
-// Delete employee
-function deleteEmployee(id) {
-    if (confirm('Are you sure you want to delete this employee?')) {
-        employees = employees.filter(emp => emp.id !== id);
-        saveToLocalStorage();
-        loadEmployeeTable();
-        alert('Employee deleted successfully!');
+// ──────────────────────────────────────────────────────────
+// Delete Employee (localStorage + MySQL DB)
+// ──────────────────────────────────────────────────────────
+async function deleteEmployee(id) {
+    if (!confirm('Are you sure you want to delete this employee?')) return;
+
+    employees = employees.filter(emp => emp.id !== id);
+    saveToLocalStorage();
+    loadEmployeeTable();
+
+    try {
+        const res  = await fetch(EMP_API + '?action=delete', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('Employee deleted successfully! (removed from database)');
+        } else {
+            alert('Deleted locally.\n⚠ DB sync: ' + data.message);
+        }
+    } catch {
+        alert('Employee deleted (localStorage only — DB server unavailable).');
     }
 }
 
@@ -2030,3 +2077,65 @@ window.updateLeaveStatus = function(leaveId, status) {
     }
 };
 
+// ──────────────────────────────────────────────────────────
+// Load Personal Info form fields (called when profile section opens)
+// ──────────────────────────────────────────────────────────
+function loadPersonalInfoForm(user) {
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+    set('piEmployeeId', user.id);
+    set('piFullName',   user.name);
+    set('piEmail',      user.email);
+    set('piUsername',   user.username);
+    set('piPhone',      user.phone || '');
+    set('piLocation',   user.location || '');
+}
+
+// ──────────────────────────────────────────────────────────
+// Save Personal Info  (localStorage + MySQL DB)
+// ──────────────────────────────────────────────────────────
+window.savePersonalInfo = async function() {
+    if (!currentUser) { alert('Not logged in.'); return; }
+
+    const name     = (document.getElementById('piFullName')?.value  || '').trim();
+    const email    = (document.getElementById('piEmail')?.value     || '').trim();
+    const phone    = (document.getElementById('piPhone')?.value     || '').trim();
+    const location = (document.getElementById('piLocation')?.value  || '').trim();
+
+    if (!name || !email) { alert('Name and email are required.'); return; }
+
+    // Update in-memory + localStorage
+    currentUser.name     = name;
+    currentUser.email    = email;
+    currentUser.phone    = phone;
+    currentUser.location = location;
+
+    const empIndex = employees.findIndex(e => e.id === currentUser.id);
+    if (empIndex >= 0) {
+        employees[empIndex].name     = name;
+        employees[empIndex].email    = email;
+        employees[empIndex].phone    = phone;
+        employees[empIndex].location = location;
+    }
+    saveToLocalStorage();
+
+    // Update displayed name in sidebar
+    const userInfoEl = document.getElementById('userInfo');
+    if (userInfoEl) userInfoEl.textContent = name;
+
+    // Sync to MySQL DB (non-blocking, silent fallback)
+    try {
+        const res  = await fetch(EMP_API + '?action=update_profile', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ id: currentUser.id, name, email, phone, location })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('Personal info saved! (updated in database)');
+        } else {
+            alert('Saved locally.\nDB sync warning: ' + data.message);
+        }
+    } catch {
+        alert('Personal info saved (localStorage only - DB server unavailable).');
+    }
+};
