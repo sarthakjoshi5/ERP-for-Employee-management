@@ -1226,14 +1226,15 @@ function checkIn() {
         return;
     }
     
-    // Get user's current location for geofencing
+    const btn = document.querySelector('#attendance button[onclick="checkIn()"]');
+    const originalText = btn.textContent;
+    
+    // Geofencing logic commented out for now
+    /*
     if (!navigator.geolocation) {
         alert('Geolocation is not supported by your browser. Attendance cannot be marked.');
         return;
     }
-
-    const btn = document.querySelector('#attendance button[onclick="checkIn()"]');
-    const originalText = btn.textContent;
     btn.textContent = 'Verifying Location...';
     btn.disabled = true;
 
@@ -1241,61 +1242,32 @@ function checkIn() {
         async (position) => {
             const userLat = position.coords.latitude;
             const userLng = position.coords.longitude;
-            
             const distance = calculateDistance(userLat, userLng, OFFICE_LAT, OFFICE_LNG);
-            
-            if (distance > ALLOWED_RADIUS_METERS) {
-                alert(`Proxy Prevention: You are too far from the office (${Math.round(distance)}m). Check-in allowed only within ${ALLOWED_RADIUS_METERS}m of the office.`);
-                btn.textContent = originalText;
-                btn.disabled = false;
-                return;
-            }
-
-            const now = new Date();
-            currentUser.activeCheckIn = now.toISOString();
-            currentUser.lastCheckInCoords = { lat: userLat, lng: userLng };
-            saveToLocalStorage();
-            
-            const statusDiv = document.getElementById('attendanceStatus');
-            statusDiv.innerHTML = `
-                <p style="color: #22543d; font-weight: bold;">✅ Checked in at ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
-                <p style="color: #22543d; font-size: 0.8rem;">Location verified (${Math.round(distance)}m from office)</p>
-                <p style="color: #718096;">Have a productive day!</p>
-            `;
-            statusDiv.style.background = '#f0fff4';
-            
-            // Sync with DB if possible
-            try {
-                const res = await fetch('erp_api.php?action=check_in', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ latitude: userLat, longitude: userLng })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    console.log('Attendance synced to DB');
-                }
-            } catch (err) {
-                console.warn('DB sync failed for attendance');
-            }
-
-            alert('Successfully checked in! Location verified.');
-            btn.textContent = originalText;
-            btn.disabled = false;
-        },
-        (error) => {
-            let msg = 'Unable to retrieve your location.';
-            switch(error.code) {
-                case error.PERMISSION_DENIED: msg = 'User denied the request for Geolocation.'; break;
-                case error.POSITION_UNAVAILABLE: msg = 'Location information is unavailable.'; break;
-                case error.TIMEOUT: msg = 'The request to get user location timed out.'; break;
-            }
-            alert(msg + ' Please enable location services to check in.');
-            btn.textContent = originalText;
-            btn.disabled = false;
-        },
-        { enableHighAccuracy: true, timeout: 5000 }
+            // ... (rest of geofencing code)
+        }
     );
+    */
+
+    // Fallback to simple check-in
+    const now = new Date();
+    currentUser.activeCheckIn = now.toISOString();
+    saveToLocalStorage();
+    
+    const statusDiv = document.getElementById('attendanceStatus');
+    statusDiv.innerHTML = `
+        <p style="color: #22543d; font-weight: bold;">✅ Checked in at ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
+        <p style="color: #718096;">Have a productive day!</p>
+    `;
+    statusDiv.style.background = '#f0fff4';
+    
+    // Attempt background sync
+    fetch('erp_api.php?action=check_in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ latitude: null, longitude: null })
+    }).catch(() => {});
+
+    alert('Successfully checked in! (Location check disabled)');
 }
 
 
