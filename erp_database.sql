@@ -215,6 +215,8 @@ CREATE TABLE attendance (
     check_out TIME,
     status ENUM('present', 'absent', 'late', 'half_day') DEFAULT 'present',
     notes TEXT,
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
     FOREIGN KEY (employee_id) REFERENCES employees(employee_id),
     UNIQUE KEY unique_employee_date (employee_id, date)
 );

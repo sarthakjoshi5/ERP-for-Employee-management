@@ -66,6 +66,12 @@ switch($action) {
     case 'resolve_change_request':
         resolveChangeRequest();
         break;
+    case 'check_in':
+        checkIn();
+        break;
+    case 'check_out':
+        checkOut();
+        break;
     default:
         echo json_encode(['success' => false, 'message' => 'Invalid action']);
         break;
@@ -310,7 +316,7 @@ function getAttendance() {
         
         $stmt = $pdo->prepare("
             SELECT 
-                a.attendance_id, a.check_in, a.check_out, a.status,
+                a.attendance_id, a.check_in, a.check_out, a.status, a.latitude, a.longitude,
                 CONCAT(e.first_name, ' ', e.last_name) as employee_name,
                 TIMESTAMPDIFF(HOUR, a.check_in, a.check_out) as working_hours
             FROM attendance a 
@@ -327,6 +333,66 @@ function getAttendance() {
             'attendance' => $attendance
         ]);
     } catch(PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+// Check in function with location
+function checkIn() {
+    global $pdo;
+    try {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $employee_id = $_SESSION['employee_id'] ?? null;
+        $lat = $data['latitude'] ?? null;
+        $lng = $data['longitude'] ?? null;
+        $date = date('Y-m-d');
+        $time = date('H:i:s');
+
+        if (!$employee_id) {
+            echo json_encode(['success' => false, 'message' => 'Not logged in']);
+            return;
+        }
+
+        // Check if already checked in today
+        $stmt = $pdo->prepare("SELECT attendance_id FROM attendance WHERE employee_id = ? AND date = ?");
+        $stmt->execute([$employee_id, $date]);
+        if ($stmt->fetch()) {
+            echo json_encode(['success' => false, 'message' => 'Already checked in today']);
+            return;
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO attendance (employee_id, date, check_in, status, latitude, longitude) VALUES (?, ?, ?, 'present', ?, ?)");
+        $stmt->execute([$employee_id, $date, $time, $lat, $lng]);
+
+        echo json_encode(['success' => true, 'message' => 'Checked in successfully']);
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+// Check out function
+function checkOut() {
+    global $pdo;
+    try {
+        $employee_id = $_SESSION['employee_id'] ?? null;
+        $date = date('Y-m-d');
+        $time = date('H:i:s');
+
+        if (!$employee_id) {
+            echo json_encode(['success' => false, 'message' => 'Not logged in']);
+            return;
+        }
+
+        $stmt = $pdo->prepare("UPDATE attendance SET check_out = ? WHERE employee_id = ? AND date = ? AND check_out IS NULL");
+        $stmt->execute([$time, $employee_id, $date]);
+
+        if ($stmt->rowCount() === 0) {
+            echo json_encode(['success' => false, 'message' => 'No active check-in found for today']);
+            return;
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Checked out successfully']);
+    } catch (PDOException $e) {
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
 }
@@ -492,6 +558,7 @@ function getComplaints() {
     } catch(PDOException $e) {
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
+}
 // Resolve a complaint
 function resolveComplaint() {
     global $pdo;

@@ -1212,6 +1212,36 @@
                         </table>
                     </div>
                 </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Attendance Verification (Geofencing)</h3>
+                        <p>Recheck attendees and their check-in locations</p>
+                    </div>
+                    <div class="card-body">
+                        <div style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
+                            <label>Select Date:</label>
+                            <input type="date" id="recheckAttendanceDate" class="form-control" style="width: auto;">
+                            <button onclick="recheckAttendance()" class="btn btn-primary" style="width: auto;">Refresh List</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Employee Name</th>
+                                        <th>Check In</th>
+                                        <th>Check Out</th>
+                                        <th>Coordinates (Lat, Lng)</th>
+                                        <th>Location Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recheckAttendanceTableBody">
+                                    <tr><td colspan="6" style="text-align: center;">Select a date and click Refresh to view attendance logs.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </section>
 
 

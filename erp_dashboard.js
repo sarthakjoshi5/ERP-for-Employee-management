@@ -1185,6 +1185,27 @@ function logout() {
 let checkInTime = null;
 let attendanceRecords = [];
 
+// Geofencing Constants (Office Location - Pune example)
+const OFFICE_LAT = 18.5204;
+const OFFICE_LNG = 73.8567;
+const ALLOWED_RADIUS_METERS = 500; 
+
+// Haversine formula to calculate distance between two points in meters
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Earth radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+}
+
 function updateCurrentTime() {
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-IN', { 
@@ -1205,18 +1226,76 @@ function checkIn() {
         return;
     }
     
-    const now = new Date();
-    currentUser.activeCheckIn = now.toISOString();
-    saveToLocalStorage();
-    
-    const statusDiv = document.getElementById('attendanceStatus');
-    statusDiv.innerHTML = `
-        <p style="color: #22543d; font-weight: bold;">✅ Checked in at ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
-        <p style="color: #718096;">Have a productive day!</p>
-    `;
-    statusDiv.style.background = '#f0fff4';
-    
-    alert('Successfully checked in!');
+    // Get user's current location for geofencing
+    if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser. Attendance cannot be marked.');
+        return;
+    }
+
+    const btn = document.querySelector('#attendance button[onclick="checkIn()"]');
+    const originalText = btn.textContent;
+    btn.textContent = 'Verifying Location...';
+    btn.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            const userLat = position.coords.latitude;
+            const userLng = position.coords.longitude;
+            
+            const distance = calculateDistance(userLat, userLng, OFFICE_LAT, OFFICE_LNG);
+            
+            if (distance > ALLOWED_RADIUS_METERS) {
+                alert(`Proxy Prevention: You are too far from the office (${Math.round(distance)}m). Check-in allowed only within ${ALLOWED_RADIUS_METERS}m of the office.`);
+                btn.textContent = originalText;
+                btn.disabled = false;
+                return;
+            }
+
+            const now = new Date();
+            currentUser.activeCheckIn = now.toISOString();
+            currentUser.lastCheckInCoords = { lat: userLat, lng: userLng };
+            saveToLocalStorage();
+            
+            const statusDiv = document.getElementById('attendanceStatus');
+            statusDiv.innerHTML = `
+                <p style="color: #22543d; font-weight: bold;">✅ Checked in at ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
+                <p style="color: #22543d; font-size: 0.8rem;">Location verified (${Math.round(distance)}m from office)</p>
+                <p style="color: #718096;">Have a productive day!</p>
+            `;
+            statusDiv.style.background = '#f0fff4';
+            
+            // Sync with DB if possible
+            try {
+                const res = await fetch('erp_api.php?action=check_in', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ latitude: userLat, longitude: userLng })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    console.log('Attendance synced to DB');
+                }
+            } catch (err) {
+                console.warn('DB sync failed for attendance');
+            }
+
+            alert('Successfully checked in! Location verified.');
+            btn.textContent = originalText;
+            btn.disabled = false;
+        },
+        (error) => {
+            let msg = 'Unable to retrieve your location.';
+            switch(error.code) {
+                case error.PERMISSION_DENIED: msg = 'User denied the request for Geolocation.'; break;
+                case error.POSITION_UNAVAILABLE: msg = 'Location information is unavailable.'; break;
+                case error.TIMEOUT: msg = 'The request to get user location timed out.'; break;
+            }
+            alert(msg + ' Please enable location services to check in.');
+            btn.textContent = originalText;
+            btn.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+    );
 }
 
 
@@ -1259,7 +1338,12 @@ function checkOut() {
     
     // Clear active check-in
     delete currentUser.activeCheckIn;
+    delete currentUser.lastCheckInCoords;
     saveToLocalStorage();
+    
+    // Sync check-out with DB
+    fetch('erp_api.php?action=check_out', { method: 'POST' })
+        .catch(() => console.log('Check-out sync failed'));
     
     // Update attendance table
     loadAttendanceTable();
@@ -2139,3 +2223,69 @@ window.savePersonalInfo = async function() {
         alert('Personal info saved (localStorage only - DB server unavailable).');
     }
 };
+
+// Recheck attendance for admin
+async function recheckAttendance() {
+    const dateInput = document.getElementById('recheckAttendanceDate');
+    const date = dateInput.value;
+    if (!date) {
+        alert('Please select a date.');
+        return;
+    }
+
+    const tbody = document.getElementById('recheckAttendanceTableBody');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Fetching records...</td></tr>';
+
+    try {
+        const res = await fetch(`erp_api.php?action=attendance&date=${date}`);
+        const data = await res.json();
+
+        if (data.success && data.attendance) {
+            if (data.attendance.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No records found for this date.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            data.attendance.forEach(record => {
+                const tr = document.createElement('tr');
+                
+                let locationStatus = '<span class="badge badge-secondary">Unknown</span>';
+                let coordinates = 'N/A';
+                
+                if (record.latitude && record.longitude) {
+                    const dist = calculateDistance(record.latitude, record.longitude, OFFICE_LAT, OFFICE_LNG);
+                    const isVerified = dist <= ALLOWED_RADIUS_METERS;
+                    locationStatus = isVerified 
+                        ? `<span class="badge badge-success">Verified (${Math.round(dist)}m)</span>`
+                        : `<span class="badge badge-danger">Out of Range (${Math.round(dist)}m)</span>`;
+                    coordinates = `${parseFloat(record.latitude).toFixed(4)}, ${parseFloat(record.longitude).toFixed(4)}`;
+                }
+
+                tr.innerHTML = `
+                    <td>${record.employee_name}</td>
+                    <td>${record.check_in || '-'}</td>
+                    <td>${record.check_out || '-'}</td>
+                    <td>${coordinates}</td>
+                    <td>${locationStatus}</td>
+                    <td>
+                        ${record.latitude ? `<a href="https://www.google.com/maps?q=${record.latitude},${record.longitude}" target="_blank" class="btn btn-sm" style="font-size: 11px; padding: 4px 8px;">View Map</a>` : '-'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #e53e3e;">Error: ${data.message || 'Failed to fetch data'}</td></tr>`;
+        }
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #e53e3e;">Connection error. Make sure the server is running.</td></tr>';
+    }
+}
+
+// Set default date for recheck to today
+document.addEventListener('DOMContentLoaded', function() {
+    const dateInput = document.getElementById('recheckAttendanceDate');
+    if (dateInput) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+});
