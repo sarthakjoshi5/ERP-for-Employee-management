@@ -1164,7 +1164,7 @@ function setupNavigation() {
             if (targetSection) {
                 targetSection.classList.remove('hidden');
                 
-                // Special handling for complaints section
+                // Special handling for sections
                 if (targetId === 'complaints') {
                     loadComplaints();
                 } else if (targetId === 'leaves') {
@@ -2254,10 +2254,5 @@ async function recheckAttendance() {
     }
 }
 
-// Set default date for recheck to today
-document.addEventListener('DOMContentLoaded', function() {
-    const dateInput = document.getElementById('recheckAttendanceDate');
-    if (dateInput) {
-        dateInput.value = new Date().toISOString().split('T')[0];
     }
 });

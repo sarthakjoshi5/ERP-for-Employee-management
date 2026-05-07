@@ -384,3 +384,4 @@ INSERT INTO employees (first_name, last_name, email, phone, department, designat
 -- Insert User for Team Leader
 INSERT INTO users (username, password, role, employee_id) VALUES
 ('alex.teamlead', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'manager', 6);
+
