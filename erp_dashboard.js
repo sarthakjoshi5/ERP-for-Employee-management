@@ -2253,6 +2253,3 @@ async function recheckAttendance() {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #e53e3e;">Connection error. Make sure the server is running.</td></tr>';
     }
 }
-
-    }
-});
